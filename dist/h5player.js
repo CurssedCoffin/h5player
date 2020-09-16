@@ -10,7 +10,7 @@
 // @name:de      HTML5 Video Player erweitertes Skript
 // @namespace    https://github.com/xxxily/h5player
 // @homepage     https://github.com/xxxily/h5player
-// @version      3.3.0
+// @version      3.3.1
 // @description  HTML5视频播放增强脚本，支持所有H5视频播放网站，全程快捷键控制，支持：倍速播放/加速播放、视频画面截图、画中画、网页全屏、调节亮度、饱和度、对比度、自定义配置功能增强等功能。
 // @description:en  HTML5 video playback enhanced script, supports all H5 video playback websites, full-length shortcut key control, supports: double-speed playback / accelerated playback, video screenshots, picture-in-picture, full-page webpage, brightness, saturation, contrast, custom configuration enhancement And other functions.
 // @description:zh  HTML5视频播放增强脚本，支持所有H5视频播放网站，全程快捷键控制，支持：倍速播放/加速播放、视频画面截图、画中画、网页全屏、调节亮度、饱和度、对比度、自定义配置功能增强等功能。
@@ -743,6 +743,19 @@ const taskConf = {
     fullScreen: 'button[name="fullscreen-button"]'
   },
   'live.bilibili.com': {
+    init: function () {
+      if (!JSON._stringifySource_) {
+        JSON._stringifySource_ = JSON.stringify;
+
+        JSON.stringify = function (arg1) {
+          try {
+            return JSON._stringifySource_.apply(this, arguments)
+          } catch (e) {
+            console.error('JSON.stringify 解释出错：', e, arg1);
+          }
+        };
+      }
+    },
     fullScreen: '.bilibili-live-player-video-controller-fullscreen-btn button',
     webFullScreen: '.bilibili-live-player-video-controller-web-fullscreen-btn button',
     switchPlayStatus: '.bilibili-live-player-video-controller-start-btn button'
@@ -2375,6 +2388,26 @@ const messages = {
       }
     },
 
+    /**
+     * 切换画中画功能
+     */
+    togglePictureInPicture () {
+      const player = this.player();
+      if (window._isPictureInPicture_) {
+        document.exitPictureInPicture().then(() => {
+          window._isPictureInPicture_ = null;
+        }).catch(() => {
+          window._isPictureInPicture_ = null;
+        });
+      } else {
+        player.requestPictureInPicture && player.requestPictureInPicture().then(() => {
+          window._isPictureInPicture_ = true;
+        }).catch(() => {
+          window._isPictureInPicture_ = null;
+        });
+      }
+    },
+
     /* 播放下一个视频，默认是没有这个功能的，只有在TCC里配置了next字段才会有该功能 */
     setNextVideo () {
       const isDo = TCC.doTask('next');
@@ -2636,19 +2669,7 @@ const messages = {
 
         // 进入或退出画中画模式
         if (key === 'p') {
-          if (window._isPictureInPicture_) {
-            document.exitPictureInPicture().then(() => {
-              window._isPictureInPicture_ = null;
-            }).catch(() => {
-              window._isPictureInPicture_ = null;
-            });
-          } else {
-            player.requestPictureInPicture && player.requestPictureInPicture().then(() => {
-              window._isPictureInPicture_ = true;
-            }).catch(() => {
-              window._isPictureInPicture_ = null;
-            });
-          }
+          t.togglePictureInPicture();
         }
 
         // 截图并下载保存
@@ -3025,8 +3046,13 @@ const messages = {
       if (!progressMap) {
         progressMap = {};
       } else {
-        progressMap = JSON.parse(progressMap);
+        try {
+          progressMap = JSON.parse(progressMap);
+        } catch (e) {
+          progressMap = {};
+        }
       }
+
       if (!player) {
         return progressMap
       } else {
